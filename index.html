@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medi-Bot: Your Health Companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .chat-container {
+            height: calc(100vh - 200px);
+        }
+        .user-message {
+            background-color: #d1e7dd;
+            border-radius: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            max-width: 80%;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #fff;
+            border-radius: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            max-width: 80%;
+            margin-right: auto;
+        }
+        /* Style for the typing indicator */
+        .typing-indicator span {
+            animation: bounce 0.8s infinite alternate;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-5px); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4 md:p-8">
+
+    <!-- Main Container -->
+    <div class="bg-white rounded-3xl shadow-xl w-full max-w-4xl p-6 md:p-8 flex flex-col h-[90vh]">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800">
+                <span class="bg-gradient-to-r from-teal-500 to-blue-600 text-transparent bg-clip-text">Medi-Bot</span>
+                <span class="text-gray-600 text-base font-normal block mt-1">Your Health Companion</span>
+            </h1>
+            <p class="text-red-500 text-sm mt-4 font-semibold">
+                Disclaimer: The information provided by this bot is for educational and informational purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.
+            </p>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-log" class="flex-1 overflow-y-auto space-y-4 p-4 bg-gray-50 rounded-2xl mb-6 shadow-inner scroll-smooth">
+            <div class="bot-message mb-2 shadow-sm">
+                Hello! I'm Medi-Bot, an AI assistant. I can provide general information about health conditions, symptoms, and medical terms.
+                How can I help you today?
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="flex items-center space-x-4">
+            <textarea id="user-input" class="flex-1 rounded-full py-3 px-6 resize-none text-gray-700 placeholder-gray-400 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-lg transition-all duration-300 h-12 overflow-hidden" placeholder="Ask a question about a health topic..."></textarea>
+            <button id="send-btn" class="bg-gradient-to-r from-teal-500 to-blue-600 text-white p-3 rounded-full shadow-lg hover:from-teal-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+            </button>
+        </div>
+        
+    </div>
+
+    <script>
+        const CHAT_API_URL = "http://localhost:3000";
+
+        const chatLog = document.getElementById('chat-log');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Function to add a message to the chat log
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', isUser ? 'user-message' : 'bot-message', 'mb-2', 'shadow-sm', 'transition-all', 'duration-300');
+            messageDiv.textContent = text;
+            chatLog.appendChild(messageDiv);
+            chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the latest message
+        }
+
+        // Add a typing indicator
+        function addTypingIndicator() {
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.id = "typing-indicator";
+            indicatorDiv.classList.add('bot-message', 'mb-2', 'shadow-sm', 'typing-indicator');
+            indicatorDiv.innerHTML = `
+                <span class="inline-block w-2 h-2 bg-gray-500 rounded-full mx-0.5"></span>
+                <span class="inline-block w-2 h-2 bg-gray-500 rounded-full mx-0.5"></span>
+                <span class="inline-block w-2 h-2 bg-gray-500 rounded-full mx-0.5"></span>
+            `;
+            chatLog.appendChild(indicatorDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        // Remove the typing indicator
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        // Function to send a message
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === "") return;
+
+            addMessage(message, true);
+            userInput.value = "";
+            userInput.style.height = 'auto'; // Reset height
+            addTypingIndicator();
+
+            try {
+                const response = await fetch(CHAT_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                removeTypingIndicator();
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't get a response. Please try again.";
+                addMessage(text);
+
+            } catch (error) {
+                console.error("Error fetching from API:", error);
+                removeTypingIndicator();
+                addMessage("I'm sorry, I couldn't connect to the service. Please check your network and make sure the server is running.");
+            }
+        }
+
+        // Event listeners for sending messages
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', () => {
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+        });
+
+    </script>
+</body>
+</html>
